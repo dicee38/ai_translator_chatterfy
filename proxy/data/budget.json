@@ -1,0 +1,10 @@
+{
+  "rate:test-token-for-skeleton-check:2026-10-02T0948": 4,
+  "total:day:2026-10-02": 0.00043840000000000003,
+  "total:month:2026-10": 0.00043840000000000003,
+  "emp:test-token-for-skeleton-check:day:2026-10-02": 0.00043840000000000003,
+  "emp:test-token-for-skeleton-check:month:2026-10": 0.00043840000000000003,
+  "rate:token-employee-a:2026-10-02T0948": 1,
+  "rate:test-token-for-skeleton-check:2026-10-02T0951": 4,
+  "rate:token-employee-a:2026-10-02T0951": 1
+}
