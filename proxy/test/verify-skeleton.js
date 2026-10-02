@@ -124,37 +124,6 @@ async function run() {
     const noAuthTranscribe = await fetch(`http://localhost:${port1}/transcribe`, { method: 'POST', body: new FormData() });
     check('POST /transcribe без токена -> 401', noAuthTranscribe.status === 401);
 
-    const okSuggestReply = await fetch(`http://localhost:${port1}/suggest-reply`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-Extension-Token': TOKEN },
-      body: JSON.stringify({
-        conversationContext: [
-          { role: 'interlocutor', text: 'salam, ca va?' },
-          { role: 'operator', text: 'Привет! Расскажи, что случилось?' },
-        ],
-      }),
-    });
-    const okSuggestReplyBody = await okSuggestReply.json();
-    check('POST /suggest-reply с валидным контекстом -> 200', okSuggestReply.status === 200);
-    check(
-      'POST /suggest-reply возвращает мок replyInDialect+backTranslationRu',
-      typeof okSuggestReplyBody.replyInDialect === 'string' && okSuggestReplyBody.replyInDialect.includes('[MOCK') &&
-      typeof okSuggestReplyBody.backTranslationRu === 'string' && okSuggestReplyBody.backTranslationRu.includes('[MOCK')
-    );
-
-    const badSuggestReply = await fetch(`http://localhost:${port1}/suggest-reply`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-Extension-Token': TOKEN },
-      body: JSON.stringify({ conversationContext: [] }),
-    });
-    check('POST /suggest-reply с пустым conversationContext -> 400', badSuggestReply.status === 400);
-
-    const noAuthSuggestReply = await fetch(`http://localhost:${port1}/suggest-reply`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ conversationContext: [{ role: 'operator', text: 'hi' }] }),
-    });
-    check('POST /suggest-reply без токена -> 401', noAuthSuggestReply.status === 401);
   } finally {
     server1.child.kill();
   }

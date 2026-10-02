@@ -1,7 +1,7 @@
 import { config as buildConfig } from './config.js';
 import * as budgetStore from './lib/budget-store.js';
 import * as openai from './lib/openai.js';
-import { estimateTranslateCostUsd, estimateTranscribeCostUsdFromFileSize, estimateTranscribeCostUsdFromDuration, estimateSuggestReplyCostUsd } from './lib/pricing.js';
+import { estimateTranslateCostUsd, estimateTranscribeCostUsdFromFileSize, estimateTranscribeCostUsdFromDuration } from './lib/pricing.js';
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // тот же лимит, что у multer в Node-версии
 
@@ -147,49 +147,6 @@ async function handleTranscribe(request, cfg, env, auth) {
   return json({ transcript: result.transcript, language: result.language });
 }
 
-function isValidConversationContext(value) {
-  return (
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every((m) => m && (m.role === 'operator' || m.role === 'interlocutor') && typeof m.text === 'string' && m.text.trim())
-  );
-}
-
-// TZ п.3.1: POST /suggest-reply { conversationContext } -> { replyInDialect, backTranslationRu }
-async function handleSuggestReply(request, cfg, env, auth) {
-  let body;
-  try {
-    body = await request.json();
-  } catch (_) {
-    return json({ error: 'bad_request', message: 'Тело запроса должно быть JSON.' }, 400);
-  }
-
-  const { conversationContext, operatorPersona } = body || {};
-  if (!isValidConversationContext(conversationContext)) {
-    return json(
-      {
-        error: 'bad_request',
-        message: 'Поле conversationContext обязательно: непустой массив { role: "operator"|"interlocutor", text: string }.',
-      },
-      400
-    );
-  }
-  if (operatorPersona !== undefined && typeof operatorPersona !== 'string') {
-    return json({ error: 'bad_request', message: 'Поле operatorPersona, если задано, должно быть строкой.' }, 400);
-  }
-
-  const estimatedCostUsd = estimateSuggestReplyCostUsd({ conversationContext, operatorPersona });
-  const limitResponse = await enforceLimits(env, cfg, auth.token, estimatedCostUsd);
-  if (limitResponse) return limitResponse;
-
-  const result = await openai.suggestReply(cfg, { conversationContext, operatorPersona });
-
-  // TZ п.3.4: в KV уходит только стоимость, не текст диалога.
-  await budgetStore.recordCost(env.BUDGET_KV, cfg, auth.token, auth.name, result.costUsd);
-
-  return json({ replyInDialect: result.replyInDialect, backTranslationRu: result.backTranslationRu });
-}
-
 export default {
   async fetch(request, env) {
     const cfg = buildConfig(env);
@@ -225,9 +182,6 @@ export default {
     }
     if (request.method === 'POST' && url.pathname === '/transcribe') {
       return handleTranscribe(request, cfg, env, auth);
-    }
-    if (request.method === 'POST' && url.pathname === '/suggest-reply') {
-      return handleSuggestReply(request, cfg, env, auth);
     }
 
     return json({ error: 'not_found', message: 'Неизвестный маршрут.' }, 404);

@@ -1,19 +1,10 @@
-// Товарная версия: Feature 1/2 всегда включены (нет переключателей, нет
-// настроек для них — упрощённый попап для покупателя). Диалект вручную
-// остаётся видимым — это полезная настройка для любого оператора.
-//
-// Всё остальное (Feature 3, адрес прокси/токен, реальный расход бюджета)
-// — внутреннее/владельческое, спрятано за ?advanced=1 в URL попапа.
-// Обычный клик по иконке расширения эту секцию не показывает; владелец
-// открывает скрытую ссылку сам (например, вкладкой
-// chrome-extension://<id>/popup.html?advanced=1).
+// Товарная версия: Feature 1/2 всегда включены (нет переключателей —
+// упрощённый попап для покупателя). Диалект вручную — полезная настройка
+// для любого оператора. Адрес прокси/токен/бюджет видны всегда: по модели
+// продажи каждая компания разворачивает свой прокси и свой ключ OpenAI
+// (docs/TZ.md §3.6), так что это не "внутренняя" настройка владельца, а
+// то, что обязан указать сам покупатель, чтобы расширение заработало.
 (function () {
-  const isAdvanced = new URLSearchParams(location.search).get('advanced') === '1';
-
-  // Только как стартовый черновик при первом открытии advanced-режима
-  // (пока operatorPersona ни разу не сохраняли) — дальше правится вручную.
-  const DEFAULT_OPERATOR_PERSONA = 'Я — трейдер с многолетним опытом, торгую на платформе Pocket Option и обучаю учеников. Провожу сессии в закрытом ВИП-канале, где ученики видят мои сделки и торгуют по моим сигналам. Некоторые ученики выбирают копитрейдинг — доверяют мне управление своим балансом на платформе, я торгую за них. Общаюсь с учениками как наставник: уверенно, по-дружески, поддерживаю мотивацию, объясняю простыми словами, отвечаю на вопросы про сделки, депозиты, ВИП-канал и копитрейдинг.';
-
   const dialectInput = document.getElementById('manualDialectOverride');
   const clearDialectBtn = document.getElementById('clearDialect');
 
@@ -37,12 +28,6 @@
 
   loadDialectSettings();
 
-  if (!isAdvanced) return; // обычный покупатель дальше ничего не видит
-
-  document.getElementById('advancedSection').style.display = '';
-
-  const feature3Checkbox = document.getElementById('feature3Enabled');
-  const personaInput = document.getElementById('operatorPersona');
   const proxyUrlInput = document.getElementById('proxyBaseUrl');
   const tokenInput = document.getElementById('extensionToken');
   const saveProxyBtn = document.getElementById('saveProxyConfig');
@@ -51,32 +36,11 @@
   const budgetBarFillEl = document.getElementById('budgetBarFill');
   const refreshBudgetBtn = document.getElementById('refreshBudget');
 
-  async function loadAdvancedSettings() {
-    const stored = await chrome.storage.local.get([
-      'feature3Enabled',
-      'operatorPersona',
-      'proxyBaseUrl',
-      'extensionToken',
-    ]);
-
-    feature3Checkbox.checked = stored.feature3Enabled === true; // дефолт: выключено
-    // undefined (ни разу не сохраняли) -> черновик; '' (осознанно очистили) -> пусто.
-    personaInput.value = stored.operatorPersona !== undefined ? stored.operatorPersona : DEFAULT_OPERATOR_PERSONA;
+  async function loadProxySettings() {
+    const stored = await chrome.storage.local.get(['proxyBaseUrl', 'extensionToken']);
     proxyUrlInput.value = stored.proxyBaseUrl || CFT_DEFAULT_PROXY_BASE_URL;
     tokenInput.value = stored.extensionToken || CFT_DEFAULT_EXTENSION_TOKEN;
   }
-
-  feature3Checkbox.addEventListener('change', () => {
-    chrome.storage.local.set({ feature3Enabled: feature3Checkbox.checked });
-  });
-
-  let personaSaveTimer = null;
-  personaInput.addEventListener('input', () => {
-    clearTimeout(personaSaveTimer);
-    personaSaveTimer = setTimeout(() => {
-      chrome.storage.local.set({ operatorPersona: personaInput.value.trim() });
-    }, 300);
-  });
 
   saveProxyBtn.addEventListener('click', async () => {
     const proxyBaseUrl = proxyUrlInput.value.trim() || CFT_DEFAULT_PROXY_BASE_URL;
@@ -137,5 +101,5 @@
 
   refreshBudgetBtn.addEventListener('click', refreshBudget);
 
-  loadAdvancedSettings().then(refreshBudget);
+  loadProxySettings().then(refreshBudget);
 })();

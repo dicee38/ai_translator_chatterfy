@@ -92,17 +92,6 @@
       .map((m) => m.content);
   }
 
-  // Feature 3 (TZ п.6.2): контекст диалога — ОБЕ стороны (в отличие от
-  // buildDialectContext, где только собеседник), с пометкой роли для
-  // промпта модели.
-  function buildConversationContext(messages, limitMessages) {
-    return messages
-      .filter((m) => m && (m.sender_type === 'incoming' || m.sender_type === 'outcoming') && typeof m.content === 'string' && m.content.trim())
-      .slice(0, limitMessages || 12)
-      .reverse()
-      .map((m) => ({ role: m.sender_type === 'incoming' ? 'interlocutor' : 'operator', text: m.content }));
-  }
-
   function getComposeEditor() {
     return document.querySelector(COMPOSE_EDITOR_SELECTOR);
   }
@@ -144,7 +133,6 @@
     getAuthToken,
     fetchChatMessages,
     buildDialectContext,
-    buildConversationContext,
     getComposeEditor,
     insertIntoCompose,
   };

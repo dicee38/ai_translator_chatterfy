@@ -130,43 +130,6 @@ async function handleTranscribe({ url, durationSeconds }) {
   return { ok: true, transcript: data.transcript, language: data.language };
 }
 
-// Feature 3 (TZ п.6, "перспектива" — сделана после того, как Feature 1 и 2
-// обкатаны в реальном использовании).
-async function handleSuggestReply({ conversationContext, operatorPersona }) {
-  const { proxyBaseUrl, extensionToken } = await getProxyConfig();
-
-  let response;
-  try {
-    response = await fetch(`${proxyBaseUrl}/suggest-reply`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Extension-Token': extensionToken,
-      },
-      body: JSON.stringify({ conversationContext, operatorPersona }),
-    });
-  } catch (err) {
-    return { ok: false, kind: 'network_error', message: 'Не удалось связаться с прокси.' };
-  }
-
-  if (response.status === 429) {
-    const body = await response.json().catch(() => ({}));
-    const kind = body.error === 'rate_limited' ? 'rate_limited' : 'budget_exceeded';
-    return { ok: false, kind, message: body.message || 'Дневной лимит бюджета исчерпан.' };
-  }
-
-  if (!response.ok) {
-    return { ok: false, kind: 'network_error', message: `Прокси вернул ошибку ${response.status}.` };
-  }
-
-  const data = await response.json().catch(() => null);
-  if (!data || typeof data.replyInDialect !== 'string' || typeof data.backTranslationRu !== 'string') {
-    return { ok: false, kind: 'network_error', message: 'Прокси вернул неожиданный ответ.' };
-  }
-
-  return { ok: true, replyInDialect: data.replyInDialect, backTranslationRu: data.backTranslationRu };
-}
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.type === 'translate') {
     handleTranslate(message.payload || {})
@@ -176,12 +139,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message && message.type === 'transcribe') {
     handleTranscribe(message.payload || {})
-      .then(sendResponse)
-      .catch((err) => sendResponse({ ok: false, kind: 'network_error', message: String(err) }));
-    return true; // ответ асинхронный
-  }
-  if (message && message.type === 'suggestReply') {
-    handleSuggestReply(message.payload || {})
       .then(sendResponse)
       .catch((err) => sendResponse({ ok: false, kind: 'network_error', message: String(err) }));
     return true; // ответ асинхронный

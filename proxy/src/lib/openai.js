@@ -3,7 +3,6 @@ const {
   estimateTranscribeCostUsdFromFileSize,
   estimateTranscribeCostUsdFromDuration,
   estimateTranslateCostUsd,
-  estimateSuggestReplyCostUsd,
   computeChatCostUsdFromUsage,
 } = require('./pricing');
 
@@ -62,9 +61,8 @@ async function transcribe({ fileBuffer, fileName, mimeType, durationSeconds }) {
 // текстом внутри user-хода.
 const TRANSLATE_SYSTEM_PROMPT = 'Ты выполняешь только одну задачу — перевод текста. Отвечай СТРОГО только самим переводом: без пояснений, без анализа языка/диалекта, без вариантов, без вводных фраз вроде "Похоже, это..." или "Примерный смысл:", без кавычек вокруг перевода. Даже если текст короткий, неоднозначный или содержит опечатки — всё равно дай один наиболее вероятный перевод, никогда не описывай, что текст непонятен. Переводи ВЕСЬ текст целиком, включая приветствия и вводные слова — не оставляй отдельные слова непереведёнными на исходном языке, даже если они кажутся общепонятными.';
 
-// TZ п.4.2 — модель дергается и для перевода (Feature 1), и в перспективе
-// для умного ответа (Feature 3, TZ п.6). Раньше это была Claude Haiku,
-// теперь — тоже OpenAI, чтобы держать один внешний вендор/один ключ.
+// TZ п.4.2 — модель дергается для перевода (Feature 1). Раньше это была
+// Claude Haiku, теперь — OpenAI.
 //
 // direction: 'to_dialect' (по умолчанию, TZ п.4.2 как задумано — оператор
 // пишет черновик, перевод идёт В диалект собеседника для отправки) или
@@ -147,84 +145,4 @@ async function translate({ text, dialectContext, targetLang, direction }) {
   return { translation, costUsd: actualCostUsd };
 }
 
-// Feature 3 (TZ п.6): контекст — обе стороны диалога, не только собеседник
-// (в отличие от dialectContext у /translate). Просим строгий JSON —
-// response_format: 'json_object' у OpenAI надёжнее, чем парсить текстовый
-// ответ по границам "---" или похожему самодельному разделителю.
-const SUGGEST_REPLY_SYSTEM_PROMPT = 'Ты помогаешь оператору поддержки написать следующий ответ собеседнику на его диалекте — по контексту переписки. Отвечай СТРОГО валидным JSON вида {"replyInDialect": "...", "backTranslationRu": "..."} — никакого текста до или после JSON, никакой markdown-обёртки (без ```json).';
-
-// operatorPersona — необязательный текст из попапа (кто оператор, чем
-// занимается, какой у него тон в переписке) — не хардкодим в промпт,
-// оператор задаёт и меняет сам через настройки, чтобы не редеплоить
-// прокси при смене легенды/тона.
-function buildSuggestReplyPrompt(conversationContext, operatorPersona) {
-  const lines = (conversationContext || [])
-    .map((m, i) => `${i + 1}. ${m.role === 'operator' ? 'Оператор' : 'Собеседник'}: "${m.text}"`)
-    .join('\n');
-
-  const personaBlock = operatorPersona && operatorPersona.trim()
-    ? `Контекст об операторе (учитывай при формулировке ответа — это его роль, легенда и манера общения):\n${operatorPersona.trim()}\n\n`
-    : '';
-
-  return `${personaBlock}Вот последние сообщения диалога в хронологическом порядке:
-${lines || '(диалог пуст)'}
-
-Предложи следующий ответ оператора собеседнику: на том же диалекте и в той же системе письма, что использует собеседник (латиница/арабица/иное — как он сам пишет), уместный по смыслу и тону, продолжающий разговор, с учётом контекста об операторе выше (если он есть). Также дай обратный перевод этого ответа на литературный русский, чтобы оператор понимал, что реально отправляет.
-
-Ответь JSON: {"replyInDialect": "<ответ на диалекте>", "backTranslationRu": "<перевод на русский>"}`;
-}
-
-async function suggestReply({ conversationContext, operatorPersona }) {
-  const estimatedCostUsd = estimateSuggestReplyCostUsd({ conversationContext, operatorPersona });
-
-  if (config.mockMode) {
-    return {
-      replyInDialect: '[MOCK ответ на диалекте]',
-      backTranslationRu: '[MOCK обратный перевод на русский]',
-      costUsd: estimatedCostUsd,
-    };
-  }
-
-  const prompt = buildSuggestReplyPrompt(conversationContext, operatorPersona);
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.openaiApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4.1-mini',
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: SUGGEST_REPLY_SYSTEM_PROMPT },
-        { role: 'user', content: prompt },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    throw new Error(`OpenAI API error: ${response.status} ${errText}`);
-  }
-
-  const data = await response.json();
-  const raw = data.choices?.[0]?.message?.content ?? '{}';
-
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    throw new Error(`Не удалось разобрать JSON-ответ модели: ${err.message}`);
-  }
-
-  const actualCostUsd = computeChatCostUsdFromUsage(data.usage) || estimatedCostUsd;
-
-  return {
-    replyInDialect: typeof parsed.replyInDialect === 'string' ? parsed.replyInDialect : '',
-    backTranslationRu: typeof parsed.backTranslationRu === 'string' ? parsed.backTranslationRu : '',
-    costUsd: actualCostUsd,
-  };
-}
-
-module.exports = { transcribe, translate, suggestReply, buildTranslatePrompt };
+module.exports = { transcribe, translate, buildTranslatePrompt };

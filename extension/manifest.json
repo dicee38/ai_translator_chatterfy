@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Chatterfy AI Translator",
   "version": "0.1.0",
-  "description": "Перевод по выделению, расшифровка+перевод голосовых и подсказка ответа для переписки в Chatterfy. Read-only помощь оператору, ничего не отправляется автоматически.",
+  "description": "Перевод по выделению и расшифровка+перевод голосовых для переписки в Chatterfy. Read-only помощь оператору, ничего не отправляется автоматически.",
   "permissions": ["storage"],
   "host_permissions": [
     "https://v2.chatterfy.ai/*",
@@ -22,8 +22,8 @@
   "content_scripts": [
     {
       "matches": ["https://v2.chatterfy.ai/*"],
-      "js": ["chatterfy-api.js", "translate-bubble.js", "content.js", "voice-translate.js", "compose-translate.js", "smart-reply.js"],
-      "css": ["bubble.css", "voice-panel.css", "compose-button.css", "smart-reply.css"],
+      "js": ["chatterfy-api.js", "translate-bubble.js", "content.js", "voice-translate.js", "compose-translate.js"],
+      "css": ["bubble.css", "voice-panel.css", "compose-button.css"],
       "run_at": "document_idle"
     }
   ]
