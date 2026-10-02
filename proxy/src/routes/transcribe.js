@@ -1,9 +1,16 @@
 const express = require('express');
 const multer = require('multer');
 const { enforceBudget } = require('../middleware/budget');
-const { estimateTranscribeCostUsdFromFileSize } = require('../lib/pricing');
+const { estimateTranscribeCostUsdFromFileSize, estimateTranscribeCostUsdFromDuration } = require('../lib/pricing');
 const { recordCost } = require('../lib/budget-store');
 const openai = require('../lib/openai');
+
+// Multer кладёт обычные (не-файловые) текстовые поля multipart в req.body —
+// durationSeconds летит как текстовое поле рядом с file.
+function parseDurationSeconds(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
 
 const router = express.Router();
 
@@ -25,13 +32,19 @@ router.post(
     }
     next();
   },
-  enforceBudget((req) => estimateTranscribeCostUsdFromFileSize(req.file.size)),
+  enforceBudget((req) => {
+    const durationSeconds = parseDurationSeconds(req.body && req.body.durationSeconds);
+    return durationSeconds !== undefined
+      ? estimateTranscribeCostUsdFromDuration(durationSeconds)
+      : estimateTranscribeCostUsdFromFileSize(req.file.size);
+  }),
   async (req, res, next) => {
     try {
       const result = await openai.transcribe({
         fileBuffer: req.file.buffer,
         fileName: req.file.originalname,
         mimeType: req.file.mimetype,
+        durationSeconds: parseDurationSeconds(req.body && req.body.durationSeconds),
       });
 
       recordCost(result.costUsd);

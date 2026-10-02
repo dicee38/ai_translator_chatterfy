@@ -35,10 +35,13 @@
     await chrome.storage.local.set({ [cacheKey(chatId, messageId)]: value });
   }
 
-  function transcribeRequest(url) {
+  // durationSeconds — реальная длительность из files[].meta.duration
+  // (Chatterfy API), передаём в прокси, чтобы бюджет считался по факту, а
+  // не по угаданной из размера файла длительности (см. proxy/*/lib/pricing.js).
+  function transcribeRequest(url, durationSeconds) {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(
-        { type: 'transcribe', payload: { url } },
+        { type: 'transcribe', payload: { url, durationSeconds } },
         (response) => resolve(response || { ok: false, kind: 'network_error' })
       );
     });
@@ -212,7 +215,7 @@
 
     if (!cached) {
       renderLoading(panel, 'Распознаю...');
-      const transcribeResponse = await transcribeRequest(voice.url);
+      const transcribeResponse = await transcribeRequest(voice.url, voice.durationSeconds);
       if (!transcribeResponse.ok) {
         handleFailure(transcribeResponse, panel, voice);
         return;
@@ -375,6 +378,7 @@
           chatId,
           messageId: m.id,
           url: f.url,
+          durationSeconds: duration,
         });
       }
     }

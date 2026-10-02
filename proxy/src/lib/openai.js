@@ -7,8 +7,17 @@ const {
   computeChatCostUsdFromUsage,
 } = require('./pricing');
 
-async function transcribe({ fileBuffer, fileName, mimeType }) {
-  const estimatedCostUsd = estimateTranscribeCostUsdFromFileSize(fileBuffer.length);
+// durationSeconds — РЕАЛЬНАЯ длительность голосового из files[].meta.duration
+// в Chatterfy API (расширение передаёт её в /transcribe отдельным полем).
+// Это и есть нормальная реализация лимита: OpenAI не отдаёт duration в
+// ответе (verbose_json не поддерживается этой моделью, см. ниже), но нам
+// и не нужно его угадывать по размеру файла — Chatterfy уже знает точную
+// длительность и показывает её в плеере, этого достаточно. Угадывание по
+// размеру — только фолбэк на случай, если durationSeconds не передали.
+async function transcribe({ fileBuffer, fileName, mimeType, durationSeconds }) {
+  const estimatedCostUsd = typeof durationSeconds === 'number'
+    ? estimateTranscribeCostUsdFromDuration(durationSeconds)
+    : estimateTranscribeCostUsdFromFileSize(fileBuffer.length);
 
   if (config.mockMode) {
     return {
@@ -24,9 +33,8 @@ async function transcribe({ fileBuffer, fileName, mimeType }) {
   // Живьём выяснилось: gpt-transcribe (реально резолвится в
   // gpt-transcribe-api-ev3) НЕ поддерживает response_format: 'verbose_json'
   // — 400 "not compatible with model...Use 'json' or 'text' instead."
-  // verbose_json был нужен только ради duration в ответе для точного
-  // списания бюджета; без него используем фолбэк — оценку по размеру файла
-  // (estimatedCostUsd, уже посчитана выше), которая для этого и существовала.
+  // Поэтому реальную стоимость считаем по durationSeconds (см. выше), а не
+  // ждём duration в ответе модели — его там не будет.
   form.append('response_format', 'json');
 
   const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -41,11 +49,8 @@ async function transcribe({ fileBuffer, fileName, mimeType }) {
   }
 
   const data = await response.json();
-  const actualCostUsd = typeof data.duration === 'number'
-    ? estimateTranscribeCostUsdFromDuration(data.duration)
-    : estimatedCostUsd;
 
-  return { transcript: data.text ?? '', language: data.language, costUsd: actualCostUsd };
+  return { transcript: data.text ?? '', language: data.language, costUsd: estimatedCostUsd };
 }
 
 // Живая проверка показала: инструкция "ответь только переводом, без

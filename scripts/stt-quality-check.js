@@ -99,7 +99,7 @@ function guessFileName(url) {
   return 'voice.ogg';
 }
 
-async function transcribeViaProxy(voiceUrl, proxyBaseUrl, extensionToken) {
+async function transcribeViaProxy(voiceUrl, proxyBaseUrl, extensionToken, durationSeconds) {
   const audioRes = await fetch(voiceUrl);
   if (!audioRes.ok) throw new Error(`не удалось скачать файл: ${audioRes.status}`);
   const buffer = Buffer.from(await audioRes.arrayBuffer());
@@ -107,6 +107,11 @@ async function transcribeViaProxy(voiceUrl, proxyBaseUrl, extensionToken) {
 
   const form = new FormData();
   form.append('file', new Blob([buffer], { type: contentType }), guessFileName(voiceUrl));
+  // Реальная длительность из Chatterfy API — прокси считает по ней бюджет
+  // точно, не угадывает по размеру файла.
+  if (typeof durationSeconds === 'number') {
+    form.append('durationSeconds', String(durationSeconds));
+  }
 
   const res = await fetch(`${proxyBaseUrl}/transcribe`, {
     method: 'POST',
@@ -165,7 +170,7 @@ async function main() {
     console.log(`--- ${i + 1}/${allVoices.length} [${v.senderType}] ${v.createdAt} (${v.durationSec ?? '?'}с) ---`);
     console.log(`URL (открыть и прослушать): ${v.url}`);
     try {
-      const result = await transcribeViaProxy(v.url, proxyBaseUrl, extensionToken);
+      const result = await transcribeViaProxy(v.url, proxyBaseUrl, extensionToken, v.durationSec);
       console.log(`Язык (по мнению модели): ${result.language || '?'}`);
       console.log(`Транскрипт: ${result.transcript}`);
     } catch (err) {

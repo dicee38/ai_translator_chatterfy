@@ -72,7 +72,7 @@ function guessFileName(url) {
 // host_permissions manifest.json; скачивание из background обходит
 // зависимость от CORS-заголовков самого бакета (см. рассуждение в шапке
 // файла про причину, по которой прокси вообще дёргается отсюда).
-async function handleTranscribe({ url }) {
+async function handleTranscribe({ url, durationSeconds }) {
   const { proxyBaseUrl, extensionToken } = await getProxyConfig();
 
   let audioResponse;
@@ -90,6 +90,12 @@ async function handleTranscribe({ url }) {
 
   const form = new FormData();
   form.append('file', new Blob([buffer], { type: contentType }), guessFileName(url));
+  // Реальная длительность из Chatterfy API (files[].meta.duration) — прокси
+  // использует её для точного расчёта бюджета вместо угадывания по размеру
+  // файла (см. docs/TZ.md §5.2 про разрыв между счётчиком и фактом).
+  if (typeof durationSeconds === 'number') {
+    form.append('durationSeconds', String(durationSeconds));
+  }
 
   let response;
   try {

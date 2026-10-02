@@ -1,9 +1,14 @@
 import { config as buildConfig } from './config.js';
 import * as budgetStore from './lib/budget-store.js';
 import * as openai from './lib/openai.js';
-import { estimateTranslateCostUsd, estimateTranscribeCostUsdFromFileSize, estimateSuggestReplyCostUsd } from './lib/pricing.js';
+import { estimateTranslateCostUsd, estimateTranscribeCostUsdFromFileSize, estimateTranscribeCostUsdFromDuration, estimateSuggestReplyCostUsd } from './lib/pricing.js';
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // тот же лимит, что у multer в Node-версии
+
+function parseDurationSeconds(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -79,7 +84,10 @@ async function handleTranscribe(request, cfg, env) {
     return json({ error: 'bad_request', message: 'Файл слишком большой (лимит 25MB).' }, 400);
   }
 
-  const estimatedCostUsd = estimateTranscribeCostUsdFromFileSize(file.size);
+  const durationSeconds = parseDurationSeconds(form.get('durationSeconds'));
+  const estimatedCostUsd = durationSeconds !== undefined
+    ? estimateTranscribeCostUsdFromDuration(durationSeconds)
+    : estimateTranscribeCostUsdFromFileSize(file.size);
   if (await budgetStore.wouldExceedBudget(env.BUDGET_KV, cfg.dailyBudgetUsd, estimatedCostUsd)) {
     return budgetExceededResponse(await budgetStore.getBudgetStatus(env.BUDGET_KV, cfg.dailyBudgetUsd));
   }
@@ -88,7 +96,7 @@ async function handleTranscribe(request, cfg, env) {
   // что "не хранить аудио дольше необходимого" (TZ п.3.4) выполняется
   // автоматически, не только по договорённости.
   const fileBuffer = new Uint8Array(await file.arrayBuffer());
-  const result = await openai.transcribe(cfg, { fileBuffer, fileName: file.name, mimeType: file.type });
+  const result = await openai.transcribe(cfg, { fileBuffer, fileName: file.name, mimeType: file.type, durationSeconds });
 
   await budgetStore.recordCost(env.BUDGET_KV, result.costUsd);
 

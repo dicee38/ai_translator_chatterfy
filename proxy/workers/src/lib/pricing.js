@@ -12,12 +12,18 @@
 const OPENAI_CHAT_PRICE_PER_1M_INPUT_TOKENS_USD = 0.4;
 const OPENAI_CHAT_PRICE_PER_1M_OUTPUT_TOKENS_USD = 1.6;
 
-// Откалибровано по реальному расходу на этапе 1 (9 голосовых, ~5.1 мин,
-// $0.2564 факта) — вышло ~$0.05/мин, заметно дороже старого плейсхолдера
-// $0.006/мин (это была цена Whisper, gpt-transcribe дороже). Раз duration
-// из ответа недоступен (verbose_json не поддерживается, см. lib/openai.js),
-// эта константа — единственный способ оценить стоимость, точность важна.
-const TRANSCRIBE_PRICE_PER_MINUTE_USD = 0.05;
+// Подтверждено официальным прайсингом OpenAI (developers.openai.com/api/docs/pricing,
+// проверено 2026-10-02): gpt-transcribe — $0.0045/мин.
+//
+// Предыдущее значение $0.05/мин было МЕТОДОЛОГИЧЕСКОЙ ОШИБКОЙ, не просто
+// устаревшей цифрой: "калибровка" на этапе 1 поделила наш же счётчик
+// (посчитанный по estimateTranscribeCostUsdFromFileSize — оценке
+// ДЛИТЕЛЬНОСТИ ПО РАЗМЕРУ ФАЙЛА) на РЕАЛЬНУЮ длительность из
+// Chatterfy API (meta.duration) — две разные величины длительности
+// смешались в одной дроби. Если угаданная по размеру длительность была
+// завышена, туда же "утекла" и цена за минуту — отсюда разрыв в разы
+// между счётчиком и фактом, на который справедливо указал оператор.
+const TRANSCRIBE_PRICE_PER_MINUTE_USD = 0.0045;
 
 function estimateTokensFromText(text) {
   if (!text) return 0;
@@ -48,6 +54,10 @@ export function estimateSuggestReplyCostUsd({ conversationContext, operatorPerso
   return inputCost + outputCost;
 }
 
+// ФОЛБЭК, не основной путь: когда вызывающий код не знает реальную
+// длительность (см. estimateTranscribeCostUsdFromDuration — именно он
+// используется, когда расширение передаёт настоящую files[].meta.duration
+// из Chatterfy API).
 const ASSUMED_BYTES_PER_SECOND = 2500;
 
 export function estimateTranscribeCostUsdFromFileSize(fileSizeBytes) {
