@@ -9,22 +9,6 @@
   <h1>Chatterfy AI Translator</h1>
 
   <section class="cft-section">
-    <label class="cft-toggle-row">
-      <input type="checkbox" id="feature1Enabled" />
-      <span>Перевод по выделению (Feature 1)</span>
-    </label>
-    <label class="cft-toggle-row" style="margin-top: 6px;">
-      <input type="checkbox" id="feature2Enabled" />
-      <span>Расшифровка + перевод голосовых (Feature 2)</span>
-    </label>
-    <label class="cft-toggle-row" style="margin-top: 6px;">
-      <input type="checkbox" id="feature3Enabled" />
-      <span>Подсказка ответа (Feature 3)</span>
-    </label>
-    <p class="cft-hint">Feature 3 только предлагает ответ — вставка в поле ввода строго по клику «Вставить», отправка всегда вручную.</p>
-  </section>
-
-  <section class="cft-section">
     <label class="cft-label" for="manualDialectOverride">Диалект вручную (если авто-определение ошиблось)</label>
     <div class="cft-row">
       <input type="text" id="manualDialectOverride" placeholder="например: марокканская дарижа, латиницей" />
@@ -33,30 +17,47 @@
     <p class="cft-hint">Пусто — перевод сам подбирает диалект по последним сообщениям собеседника.</p>
   </section>
 
-  <section class="cft-section">
-    <label class="cft-label" for="operatorPersona">Контекст о себе (для подсказки ответа, Feature 3)</label>
-    <textarea id="operatorPersona" rows="4" placeholder="Кто вы, чем занимаетесь, в каком тоне общаетесь с собеседниками"></textarea>
-    <p class="cft-hint">Учитывается только при генерации предложенного ответа (кнопка 💬). На перевод и расшифровку не влияет.</p>
-  </section>
+  <!--
+    Скрытая секция — не часть товарной поставки, видна только по прямой
+    ссылке popup.html?advanced=1 (владелец открывает её сам, обычный клик
+    по иконке расширения её не показывает). Содержит Feature 3 (ещё не
+    продаётся, но нужна владельцу) и внутреннюю инфраструктуру (адрес
+    прокси/токен, реальный расход бюджета) — не для глаз покупателя.
+  -->
+  <div id="advancedSection" style="display:none;">
+    <section class="cft-section">
+      <label class="cft-toggle-row">
+        <input type="checkbox" id="feature3Enabled" />
+        <span>Подсказка ответа (Feature 3)</span>
+      </label>
+      <p class="cft-hint">Только для владельца — не часть товарной поставки. Вставка в поле ввода строго по клику «Вставить», отправка всегда вручную.</p>
+    </section>
 
-  <section class="cft-section">
-    <h2 class="cft-subheading">Прокси</h2>
-    <label class="cft-label" for="proxyBaseUrl">Адрес прокси</label>
-    <input type="text" id="proxyBaseUrl" placeholder="http://localhost:8787" />
-    <label class="cft-label" for="extensionToken">Токен (X-Extension-Token)</label>
-    <input type="password" id="extensionToken" placeholder="dev-local-token" />
-    <div class="cft-row">
-      <button type="button" id="saveProxyConfig" class="cft-btn">Сохранить</button>
-      <span id="saveStatus" class="cft-hint"></span>
-    </div>
-  </section>
+    <section class="cft-section">
+      <label class="cft-label" for="operatorPersona">Контекст о себе (для подсказки ответа, Feature 3)</label>
+      <textarea id="operatorPersona" rows="4" placeholder="Кто вы, чем занимаетесь, в каком тоне общаетесь с собеседниками"></textarea>
+      <p class="cft-hint">Учитывается только при генерации предложенного ответа (кнопка 💬).</p>
+    </section>
 
-  <section class="cft-section">
-    <h2 class="cft-subheading">Дневной бюджет</h2>
-    <div id="budgetStatus" class="cft-budget">Проверяю...</div>
-    <div class="cft-budget-bar"><div id="budgetBarFill" class="cft-budget-bar__fill"></div></div>
-    <button type="button" id="refreshBudget" class="cft-btn cft-btn--ghost">Обновить</button>
-  </section>
+    <section class="cft-section">
+      <h2 class="cft-subheading">Прокси</h2>
+      <label class="cft-label" for="proxyBaseUrl">Адрес прокси</label>
+      <input type="text" id="proxyBaseUrl" placeholder="http://localhost:8787" />
+      <label class="cft-label" for="extensionToken">Токен (X-Extension-Token)</label>
+      <input type="password" id="extensionToken" placeholder="dev-local-token" />
+      <div class="cft-row">
+        <button type="button" id="saveProxyConfig" class="cft-btn">Сохранить</button>
+        <span id="saveStatus" class="cft-hint"></span>
+      </div>
+    </section>
+
+    <section class="cft-section">
+      <h2 class="cft-subheading">Дневной бюджет</h2>
+      <div id="budgetStatus" class="cft-budget">Проверяю...</div>
+      <div class="cft-budget-bar"><div id="budgetBarFill" class="cft-budget-bar__fill"></div></div>
+      <button type="button" id="refreshBudget" class="cft-btn cft-btn--ghost">Обновить</button>
+    </section>
+  </div>
 
   <script src="shared-defaults.js"></script>
   <script src="popup.js"></script>

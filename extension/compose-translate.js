@@ -9,21 +9,17 @@
   const RESCAN_INTERVAL_MS = 1500;
   const DIALECT_CONTEXT_MESSAGES = 10;
 
-  const settings = { feature1Enabled: true, manualDialectOverride: '' };
+  const settings = { manualDialectOverride: '' };
 
   function applyStoredSettings(stored) {
-    if (stored.feature1Enabled !== undefined) settings.feature1Enabled = stored.feature1Enabled !== false;
     if (stored.manualDialectOverride !== undefined) settings.manualDialectOverride = stored.manualDialectOverride || '';
   }
 
-  chrome.storage.local.get(['feature1Enabled', 'manualDialectOverride'], applyStoredSettings);
+  chrome.storage.local.get(['manualDialectOverride'], applyStoredSettings);
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    const patch = {};
-    if (changes.feature1Enabled) patch.feature1Enabled = changes.feature1Enabled.newValue;
-    if (changes.manualDialectOverride) patch.manualDialectOverride = changes.manualDialectOverride.newValue;
-    applyStoredSettings(patch);
+    if (changes.manualDialectOverride) applyStoredSettings({ manualDialectOverride: changes.manualDialectOverride.newValue });
   });
 
   function getEditorText(editor) {
@@ -101,7 +97,6 @@
   }
 
   function scan() {
-    if (!settings.feature1Enabled) return;
     const editor = window.CftChatterfyApi.getComposeEditor();
     if (!editor) return;
     ensureButton(editor);

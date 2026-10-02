@@ -10,26 +10,20 @@
   // хеширования тут не нужна.
   const translationCache = new Map();
 
-  // Настройки из попапа (TZ п.5, этап 5). Дефолты — feature1Enabled: true,
-  // пустой override, чтобы до первого чтения storage поведение не менялось.
-  const settings = { feature1Enabled: true, manualDialectOverride: '' };
+  // Feature 1 всегда включена (товарная версия — без переключателя в
+  // попапе). Ручной override диалекта остаётся настраиваемым — это
+  // полезно любому оператору, не внутренний dev-рычаг.
+  const settings = { manualDialectOverride: '' };
 
   function applyStoredSettings(stored) {
-    if (stored.feature1Enabled !== undefined) settings.feature1Enabled = stored.feature1Enabled !== false;
     if (stored.manualDialectOverride !== undefined) settings.manualDialectOverride = stored.manualDialectOverride || '';
   }
 
-  chrome.storage.local.get(['feature1Enabled', 'manualDialectOverride'], applyStoredSettings);
+  chrome.storage.local.get(['manualDialectOverride'], applyStoredSettings);
 
-  // Живое обновление без перезагрузки страницы, если оператор переключил
-  // что-то в попапе, пока вкладка с Chatterfy уже открыта.
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    const patch = {};
-    if (changes.feature1Enabled) patch.feature1Enabled = changes.feature1Enabled.newValue;
-    if (changes.manualDialectOverride) patch.manualDialectOverride = changes.manualDialectOverride.newValue;
-    applyStoredSettings(patch);
-    if (patch.feature1Enabled === false) window.CftTranslateBubble.hide();
+    if (changes.manualDialectOverride) applyStoredSettings({ manualDialectOverride: changes.manualDialectOverride.newValue });
   });
 
   // Живьём выяснилось (проверка на реальном Chatterfy) — направление
@@ -109,8 +103,6 @@
   }
 
   document.addEventListener('mouseup', (e) => {
-    if (!settings.feature1Enabled) return;
-
     const container = window.CftChatterfyApi.getChatContainer();
     if (!container || !container.contains(e.target)) {
       return;

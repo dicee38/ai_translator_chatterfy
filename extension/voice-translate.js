@@ -8,18 +8,7 @@
   const RESCAN_INTERVAL_MS = 2000;
   const DIALECT_CONTEXT_MESSAGES = 10;
 
-  const settings = { feature2Enabled: true };
-
-  function applyStoredSettings(stored) {
-    if (stored.feature2Enabled !== undefined) settings.feature2Enabled = stored.feature2Enabled !== false;
-  }
-
-  chrome.storage.local.get(['feature2Enabled'], applyStoredSettings);
-
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return;
-    if (changes.feature2Enabled) applyStoredSettings({ feature2Enabled: changes.feature2Enabled.newValue });
-  });
+  // Feature 2 всегда включена (товарная версия — без переключателя в попапе).
 
   function cacheKey(chatId, messageId) {
     return `cft-voice:${chatId}:${messageId}`;
@@ -335,8 +324,6 @@
   // перевешивает; если узел для голосового больше не годится (переиспользован
   // под что-то другое) — снимает панель.
   async function scanForVoices() {
-    if (!settings.feature2Enabled) return;
-
     const chatId = window.CftChatterfyApi.getChatId();
     if (!chatId) return;
 

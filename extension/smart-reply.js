@@ -11,10 +11,15 @@
   const RESCAN_INTERVAL_MS = 1500;
   const CONVERSATION_CONTEXT_MESSAGES = 12;
 
-  const settings = { feature3Enabled: true, operatorPersona: '' };
+  // Товарная версия: Feature 1/2 всегда включены, без переключателя. Feature
+  // 3 — наоборот, по умолчанию ВЫКЛЮЧЕНА и не имеет переключателя в обычном
+  // попапе (не часть того, что продаётся) — но код не удалён, включается
+  // через скрытую ссылку popup.html?advanced=1 (см. popup.js), которую знает
+  // только владелец. Дефолт сознательно false (раньше был true).
+  const settings = { feature3Enabled: false, operatorPersona: '' };
 
   function applyStoredSettings(stored) {
-    if (stored.feature3Enabled !== undefined) settings.feature3Enabled = stored.feature3Enabled !== false;
+    if (stored.feature3Enabled !== undefined) settings.feature3Enabled = stored.feature3Enabled === true;
     if (stored.operatorPersona !== undefined) settings.operatorPersona = stored.operatorPersona || '';
   }
 
