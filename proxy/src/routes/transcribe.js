@@ -1,6 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-const { enforceBudget } = require('../middleware/budget');
+const { enforceBudget, enforceRateLimit } = require('../middleware/budget');
 const { estimateTranscribeCostUsdFromFileSize, estimateTranscribeCostUsdFromDuration } = require('../lib/pricing');
 const { recordCost } = require('../lib/budget-store');
 const openai = require('../lib/openai');
@@ -32,6 +32,7 @@ router.post(
     }
     next();
   },
+  enforceRateLimit,
   enforceBudget((req) => {
     const durationSeconds = parseDurationSeconds(req.body && req.body.durationSeconds);
     return durationSeconds !== undefined
@@ -47,7 +48,7 @@ router.post(
         durationSeconds: parseDurationSeconds(req.body && req.body.durationSeconds),
       });
 
-      recordCost(result.costUsd);
+      recordCost(req.employeeToken, req.employeeName, result.costUsd);
 
       res.json({ transcript: result.transcript, language: result.language });
     } catch (err) {

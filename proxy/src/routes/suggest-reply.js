@@ -1,5 +1,5 @@
 const express = require('express');
-const { enforceBudget } = require('../middleware/budget');
+const { enforceBudget, enforceRateLimit } = require('../middleware/budget');
 const { estimateSuggestReplyCostUsd } = require('../lib/pricing');
 const { recordCost } = require('../lib/budget-store');
 const openai = require('../lib/openai');
@@ -17,6 +17,7 @@ function isValidConversationContext(value) {
 // TZ п.3.1: POST /suggest-reply { conversationContext } -> { replyInDialect, backTranslationRu }
 router.post(
   '/suggest-reply',
+  enforceRateLimit,
   enforceBudget((req) => estimateSuggestReplyCostUsd(req.body || {})),
   async (req, res, next) => {
     try {
@@ -35,7 +36,7 @@ router.post(
       const result = await openai.suggestReply({ conversationContext, operatorPersona });
 
       // TZ п.3.4: в лог/хранилище уходит только стоимость, не текст диалога.
-      recordCost(result.costUsd);
+      recordCost(req.employeeToken, req.employeeName, result.costUsd);
 
       res.json({ replyInDialect: result.replyInDialect, backTranslationRu: result.backTranslationRu });
     } catch (err) {

@@ -80,7 +80,7 @@
     if (response.ok) {
       translationCache.set(cacheKey, response.translation);
       window.CftTranslateBubble.showSuccess(response.translation);
-    } else if (response.kind === 'budget_exceeded') {
+    } else if (response.kind === 'budget_exceeded' || response.kind === 'rate_limited') {
       window.CftTranslateBubble.showBudgetExceeded(response.message);
     } else {
       window.CftTranslateBubble.showNetworkError(() => runTranslation(text, chatId, cacheKey));

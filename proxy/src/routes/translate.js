@@ -1,5 +1,5 @@
 const express = require('express');
-const { enforceBudget } = require('../middleware/budget');
+const { enforceBudget, enforceRateLimit } = require('../middleware/budget');
 const { estimateTranslateCostUsd } = require('../lib/pricing');
 const { recordCost } = require('../lib/budget-store');
 const openai = require('../lib/openai');
@@ -9,6 +9,7 @@ const router = express.Router();
 // TZ п.3.1: POST /translate { text, dialectContext, targetLang? } -> { translation }
 router.post(
   '/translate',
+  enforceRateLimit,
   enforceBudget((req) => estimateTranslateCostUsd(req.body || {})),
   async (req, res, next) => {
     try {
@@ -28,7 +29,7 @@ router.post(
       const result = await openai.translate({ text, dialectContext: dialectContext || [], targetLang, direction });
 
       // TZ п.3.4: в лог/хранилище уходит только стоимость, не текст.
-      recordCost(result.costUsd);
+      recordCost(req.employeeToken, req.employeeName, result.costUsd);
 
       res.json({ translation: result.translation });
     } catch (err) {

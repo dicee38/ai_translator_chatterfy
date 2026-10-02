@@ -183,7 +183,7 @@
   }
 
   function handleFailure(response, panel, voice) {
-    if (response.kind === 'budget_exceeded') {
+    if (response.kind === 'budget_exceeded' || response.kind === 'rate_limited') {
       renderBudgetExceeded(panel, response.message, () => resetToIdle(panel, voice));
     } else {
       renderError(

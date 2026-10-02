@@ -37,7 +37,11 @@ async function handleTranslate({ text, dialectContext, targetLang, direction }) 
 
   if (response.status === 429) {
     const body = await response.json().catch(() => ({}));
-    return { ok: false, kind: 'budget_exceeded', message: body.message || 'Дневной лимит бюджета на перевод исчерпан.' };
+    // error: 'rate_limited' — лимит запросов/минуту (TZ, вопрос "как не дать
+    // сотруднику зациклиться"), отдельно от 'budget_exceeded' — закончились
+    // деньги. Разные причины, разное сообщение оператору.
+    const kind = body.error === 'rate_limited' ? 'rate_limited' : 'budget_exceeded';
+    return { ok: false, kind, message: body.message || 'Дневной лимит бюджета на перевод исчерпан.' };
   }
 
   if (!response.ok) {
@@ -110,7 +114,8 @@ async function handleTranscribe({ url, durationSeconds }) {
 
   if (response.status === 429) {
     const body = await response.json().catch(() => ({}));
-    return { ok: false, kind: 'budget_exceeded', message: body.message || 'Дневной лимит бюджета исчерпан.' };
+    const kind = body.error === 'rate_limited' ? 'rate_limited' : 'budget_exceeded';
+    return { ok: false, kind, message: body.message || 'Дневной лимит бюджета исчерпан.' };
   }
 
   if (!response.ok) {
@@ -146,7 +151,8 @@ async function handleSuggestReply({ conversationContext, operatorPersona }) {
 
   if (response.status === 429) {
     const body = await response.json().catch(() => ({}));
-    return { ok: false, kind: 'budget_exceeded', message: body.message || 'Дневной лимит бюджета исчерпан.' };
+    const kind = body.error === 'rate_limited' ? 'rate_limited' : 'budget_exceeded';
+    return { ok: false, kind, message: body.message || 'Дневной лимит бюджета исчерпан.' };
   }
 
   if (!response.ok) {

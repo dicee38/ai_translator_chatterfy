@@ -16,7 +16,7 @@ function resetBudgetFile() {
   fs.rmSync(DATA_DIR, { recursive: true, force: true });
 }
 
-function startServer({ port, dailyBudgetUsd }) {
+function startServer({ port, dailyBudgetUsd, extraEnv }) {
   const child = spawn(process.execPath, [path.join(__dirname, '..', 'src', 'server.js')], {
     env: {
       ...process.env,
@@ -24,6 +24,7 @@ function startServer({ port, dailyBudgetUsd }) {
       MOCK_MODE: 'true',
       EXTENSION_TOKEN: TOKEN,
       DAILY_BUDGET_USD: String(dailyBudgetUsd),
+      ...extraEnv,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -175,6 +176,95 @@ async function run() {
     check('POST /translate 429 содержит error: budget_exceeded', overBudgetBody.error === 'budget_exceeded');
   } finally {
     server2.child.kill();
+  }
+
+  resetBudgetFile();
+
+  // --- Сервер №3: мульти-токен (per-employee), суб-лимит, rate limit, admin ---
+  console.log('== Сервер #3 (per-employee токены, суб-лимит, rate limit, admin) ==');
+  const port3 = 8799;
+  const EMP_A = 'token-employee-a';
+  const EMP_B = 'token-employee-b';
+  const ADMIN_TOKEN = 'test-admin-token';
+  const server3 = startServer({
+    port: port3,
+    dailyBudgetUsd: 5,
+    extraEnv: {
+      EXTENSION_TOKEN: '',
+      EXTENSION_TOKENS: JSON.stringify({ [EMP_A]: 'Иван', [EMP_B]: 'Мария' }),
+      EMPLOYEE_DAILY_BUDGET_USD: '0',
+      MONTHLY_BUDGET_USD: '50',
+      RATE_LIMIT_PER_MINUTE: '2',
+      ADMIN_TOKEN,
+    },
+  });
+  try {
+    await waitForHealth(port3);
+
+    const empAReq = () => fetch(`http://localhost:${port3}/translate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Extension-Token': EMP_A },
+      body: JSON.stringify({ text: 'Привет', dialectContext: [] }),
+    });
+
+    const subLimitHit = await empAReq();
+    const subLimitBody = await subLimitHit.json();
+    check('POST /translate с нулевым персональным суб-лимитом -> 429', subLimitHit.status === 429);
+    check('429 причина employee_daily', subLimitBody.reason === 'employee_daily');
+
+    const unknownToken = await fetch(`http://localhost:${port3}/translate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Extension-Token': 'not-a-real-employee-token' },
+      body: JSON.stringify({ text: 'Привет', dialectContext: [] }),
+    });
+    check('POST /translate с неизвестным токеном -> 401', unknownToken.status === 401);
+
+    const noAdminToken = await fetch(`http://localhost:${port3}/admin/usage`);
+    check('GET /admin/usage без токена -> 401', noAdminToken.status === 401);
+
+    const adminReport = await fetch(`http://localhost:${port3}/admin/usage`, {
+      headers: { 'X-Admin-Token': ADMIN_TOKEN },
+    });
+    const adminReportBody = await adminReport.json();
+    check('GET /admin/usage с верным токеном -> 200', adminReport.status === 200);
+    check(
+      'GET /admin/usage содержит разбивку по сотрудникам (Иван, Мария)',
+      Array.isArray(adminReportBody.employees) &&
+      adminReportBody.employees.some((e) => e.name === 'Иван') &&
+      adminReportBody.employees.some((e) => e.name === 'Мария')
+    );
+    check('GET /admin/usage содержит месячный лимит компании', adminReportBody.company.monthlyLimitUsd === 50);
+  } finally {
+    server3.child.kill();
+  }
+
+  resetBudgetFile();
+
+  // --- Сервер №4: rate limit без бюджетного суб-лимита (чтобы не путать причины 429) ---
+  console.log('== Сервер #4 (rate limit) ==');
+  const port4 = 8800;
+  const server4 = startServer({
+    port: port4,
+    dailyBudgetUsd: 5,
+    extraEnv: { RATE_LIMIT_PER_MINUTE: '2' },
+  });
+  try {
+    await waitForHealth(port4);
+
+    const makeReq = () => fetch(`http://localhost:${port4}/translate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Extension-Token': TOKEN },
+      body: JSON.stringify({ text: 'Привет', dialectContext: [] }),
+    });
+
+    await makeReq();
+    await makeReq();
+    const thirdReq = await makeReq();
+    const thirdBody = await thirdReq.json();
+    check('POST /translate после превышения лимита запросов/мин -> 429', thirdReq.status === 429);
+    check('429 содержит error: rate_limited', thirdBody.error === 'rate_limited');
+  } finally {
+    server4.child.kill();
   }
 
   resetBudgetFile();

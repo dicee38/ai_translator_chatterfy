@@ -161,7 +161,7 @@
     const response = await suggestReplyRequest(conversationContext);
 
     if (!response.ok) {
-      const message = response.kind === 'budget_exceeded'
+      const message = (response.kind === 'budget_exceeded' || response.kind === 'rate_limited')
         ? (response.message || 'Дневной лимит бюджета исчерпан.')
         : 'Не удалось получить предложение, попробуйте ещё раз.';
       renderError(panel, message, () => panel.remove());

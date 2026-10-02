@@ -188,6 +188,74 @@ async function run() {
   );
   check('POST /translate без EXTENSION_TOKEN на сервере -> 500', misconfigured.status === 500);
 
+  console.log('== Per-employee токены, суб-лимит, rate limit, admin ==');
+  const EMP_A = 'token-employee-a';
+  const EMP_B = 'token-employee-b';
+  const ADMIN_TOKEN = 'test-admin-token';
+  const multiEnv = makeEnv({
+    EXTENSION_TOKEN: '',
+    EXTENSION_TOKENS: JSON.stringify({ [EMP_A]: 'Иван', [EMP_B]: 'Мария' }),
+    EMPLOYEE_DAILY_BUDGET_USD: '0',
+    MONTHLY_BUDGET_USD: '50',
+    ADMIN_TOKEN,
+  });
+
+  const subLimitHit = await worker.fetch(
+    new Request('http://local/translate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Extension-Token': EMP_A },
+      body: JSON.stringify({ text: 'Привет', dialectContext: [] }),
+    }),
+    multiEnv
+  );
+  const subLimitBody = await subLimitHit.json();
+  check('POST /translate с нулевым персональным суб-лимитом -> 429', subLimitHit.status === 429);
+  check('429 причина employee_daily', subLimitBody.reason === 'employee_daily');
+
+  const unknownToken = await worker.fetch(
+    new Request('http://local/translate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Extension-Token': 'not-a-real-employee-token' },
+      body: JSON.stringify({ text: 'Привет', dialectContext: [] }),
+    }),
+    multiEnv
+  );
+  check('POST /translate с неизвестным токеном -> 401', unknownToken.status === 401);
+
+  const noAdminToken = await worker.fetch(new Request('http://local/admin/usage'), multiEnv);
+  check('GET /admin/usage без токена -> 401', noAdminToken.status === 401);
+
+  const adminReport = await worker.fetch(
+    new Request('http://local/admin/usage', { headers: { 'X-Admin-Token': ADMIN_TOKEN } }),
+    multiEnv
+  );
+  const adminReportBody = await adminReport.json();
+  check('GET /admin/usage с верным токеном -> 200', adminReport.status === 200);
+  check(
+    'GET /admin/usage содержит разбивку по сотрудникам (Иван, Мария)',
+    Array.isArray(adminReportBody.employees) &&
+    adminReportBody.employees.some((e) => e.name === 'Иван') &&
+    adminReportBody.employees.some((e) => e.name === 'Мария')
+  );
+  check('GET /admin/usage содержит месячный лимит компании', adminReportBody.company.monthlyLimitUsd === 50);
+
+  console.log('== Rate limit ==');
+  const rateEnv = makeEnv({ RATE_LIMIT_PER_MINUTE: '2' });
+  const makeRateReq = () => worker.fetch(
+    new Request('http://local/translate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Extension-Token': TOKEN },
+      body: JSON.stringify({ text: 'Привет', dialectContext: [] }),
+    }),
+    rateEnv
+  );
+  await makeRateReq();
+  await makeRateReq();
+  const thirdRateReq = await makeRateReq();
+  const thirdRateBody = await thirdRateReq.json();
+  check('POST /translate после превышения лимита запросов/мин -> 429', thirdRateReq.status === 429);
+  check('429 содержит error: rate_limited', thirdRateBody.error === 'rate_limited');
+
   console.log('');
   if (failures > 0) {
     console.error(`Провалено проверок: ${failures}`);

@@ -65,8 +65,9 @@
 
     // Кратко подсвечиваем кнопку и кладём причину в title — не городим
     // модалки и плашки поверх поля ввода, оно и так занято текстом.
-    btn.title = response.message || (response.kind === 'budget_exceeded' ? 'Дневной лимит бюджета исчерпан' : 'Не удалось перевести, попробуйте ещё раз');
-    btn.classList.add(response.kind === 'budget_exceeded' ? 'cft-compose-btn--warn' : 'cft-compose-btn--error');
+    const isLimited = response.kind === 'budget_exceeded' || response.kind === 'rate_limited';
+    btn.title = response.message || (isLimited ? 'Дневной лимит бюджета исчерпан' : 'Не удалось перевести, попробуйте ещё раз');
+    btn.classList.add(isLimited ? 'cft-compose-btn--warn' : 'cft-compose-btn--error');
     setTimeout(() => {
       btn.classList.remove('cft-compose-btn--warn', 'cft-compose-btn--error');
       btn.title = 'Перевести в диалект собеседника';

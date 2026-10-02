@@ -5,16 +5,26 @@ const { getBudgetStatus } = require('./lib/budget-store');
 const translateRoute = require('./routes/translate');
 const transcribeRoute = require('./routes/transcribe');
 const suggestReplyRoute = require('./routes/suggest-reply');
+const adminRoute = require('./routes/admin');
 
 assertStartupInvariants();
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 
-// Без авторизации, чисто для проверки, что процесс жив и в каком он режиме.
+// Без обязательной авторизации (чисто для проверки, что процесс жив и в
+// каком он режиме) — но если X-Extension-Token передан и валиден, в ответе
+// дополнительно появляется персональный суб-лимит именно этого сотрудника
+// (budget.employee), не только общий бюджет компании.
 app.get('/health', (req, res) => {
-  res.json({ ok: true, mockMode: config.mockMode, budget: getBudgetStatus() });
+  const provided = req.get('X-Extension-Token');
+  const token = provided && config.employeeTokens[provided] ? provided : null;
+  res.json({ ok: true, mockMode: config.mockMode, budget: getBudgetStatus(token) });
 });
+
+// Свой токен (X-Admin-Token), не операторский — должен быть доступен
+// главе компании без прохождения общей авторизации сотрудников.
+app.use(adminRoute);
 
 app.use(requireExtensionToken);
 
