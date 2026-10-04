@@ -49,6 +49,13 @@ export function config(env) {
     employeeDailyBudgetUsd: nullableNumberFromEnv(env.EMPLOYEE_DAILY_BUDGET_USD),
     employeeTokens: parseEmployeeTokens(env.EXTENSION_TOKENS, env.EXTENSION_TOKEN),
     rateLimitPerMinute: numberFromEnv(env.RATE_LIMIT_PER_MINUTE, 20),
+    // Как часто суммы расхода сбрасываются из памяти изолята в KV.
+    // Бесплатный тариф KV — 1000 записей в сутки на аккаунт, и это
+    // единственный параметр, которым регулируется их расход: 120 с дают
+    // не больше ~720 записей в сутки на изолят даже под непрерывной
+    // нагрузкой. Меньше ставить не нужно, больше — если записей всё ещё
+    // не хватает (ценой того, что чужие изоляты дольше не видят расход).
+    kvFlushIntervalSeconds: numberFromEnv(env.KV_FLUSH_INTERVAL_SECONDS, 120),
     alertWebhookUrl: env.ALERT_WEBHOOK_URL || '',
     adminToken: env.ADMIN_TOKEN || '',
   };

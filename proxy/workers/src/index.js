@@ -45,14 +45,30 @@ function rateLimitedResponse(cfg) {
   );
 }
 
+// recordCost возвращает промис фоновой работы (отложенный сброс сумм в KV
+// и, возможно, вебхук об исчерпании бюджета). Держать на нём ответ
+// пользователю незачем, поэтому отдаём его в ctx.waitUntil; без ctx
+// (самопроверка из test/verify-workers-skeleton.js вызывает fetch без
+// третьего аргумента) — просто дожидаемся, чтобы поведение было
+// детерминированным.
+function background(ctx, promise) {
+  if (ctx && typeof ctx.waitUntil === 'function') {
+    ctx.waitUntil(promise);
+    return Promise.resolve();
+  }
+  return promise;
+}
+
 // Общая проверка rate-limit + бюджета перед выполнением платного вызова —
 // одна и та же логика нужна всем трём маршрутам, вынесена, чтобы не
 // дублировать трижды.
 async function enforceLimits(env, cfg, token, estimatedCostUsd) {
-  if (!(await budgetStore.checkRateLimit(env.BUDGET_KV, cfg, token))) {
+  // Счётчик запросов/мин живёт в памяти изолята (см. budget-store.js) —
+  // синхронный и без обращений к KV.
+  if (!budgetStore.checkRateLimit(env.BUDGET_KV, cfg, token)) {
     return rateLimitedResponse(cfg);
   }
-  await budgetStore.recordRateLimitHit(env.BUDGET_KV, token);
+  budgetStore.recordRateLimitHit(env.BUDGET_KV, token);
 
   const result = await budgetStore.checkBudget(env.BUDGET_KV, cfg, token, estimatedCostUsd);
   if (result.exceeded) {
@@ -80,7 +96,7 @@ async function handleAdminUsage(request, cfg, env) {
 }
 
 // TZ п.3.1: POST /translate { text, dialectContext, targetLang? } -> { translation }
-async function handleTranslate(request, cfg, env, auth) {
+async function handleTranslate(request, cfg, env, auth, ctx) {
   let body;
   try {
     body = await request.json();
@@ -107,13 +123,13 @@ async function handleTranslate(request, cfg, env, auth) {
   const result = await openai.translate(cfg, { text, dialectContext: dialectContext || [], targetLang, direction });
 
   // TZ п.3.4: в KV уходит только стоимость, не текст.
-  await budgetStore.recordCost(env.BUDGET_KV, cfg, auth.token, auth.name, result.costUsd);
+  await background(ctx, budgetStore.recordCost(env.BUDGET_KV, cfg, auth.token, auth.name, result.costUsd));
 
   return json({ translation: result.translation });
 }
 
 // TZ п.3.1: POST /transcribe multipart/form-data, поле file -> { transcript, language? }
-async function handleTranscribe(request, cfg, env, auth) {
+async function handleTranscribe(request, cfg, env, auth, ctx) {
   let form;
   try {
     form = await request.formData();
@@ -142,13 +158,13 @@ async function handleTranscribe(request, cfg, env, auth) {
   const fileBuffer = new Uint8Array(await file.arrayBuffer());
   const result = await openai.transcribe(cfg, { fileBuffer, fileName: file.name, mimeType: file.type, durationSeconds });
 
-  await budgetStore.recordCost(env.BUDGET_KV, cfg, auth.token, auth.name, result.costUsd);
+  await background(ctx, budgetStore.recordCost(env.BUDGET_KV, cfg, auth.token, auth.name, result.costUsd));
 
   return json({ transcript: result.transcript, language: result.language });
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const cfg = buildConfig(env);
     const url = new URL(request.url);
 
@@ -178,10 +194,10 @@ export default {
     const auth = { token: provided, name: employeeName };
 
     if (request.method === 'POST' && url.pathname === '/translate') {
-      return handleTranslate(request, cfg, env, auth);
+      return handleTranslate(request, cfg, env, auth, ctx);
     }
     if (request.method === 'POST' && url.pathname === '/transcribe') {
-      return handleTranscribe(request, cfg, env, auth);
+      return handleTranscribe(request, cfg, env, auth, ctx);
     }
 
     return json({ error: 'not_found', message: 'Неизвестный маршрут.' }, 404);
