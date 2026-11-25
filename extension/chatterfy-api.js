@@ -15,9 +15,17 @@
 
   const MESSAGES_SEARCH_URL = 'https://migration-api.chatterfy.ai/api/messages/v1/search';
 
-  // TZ п.6.2: подтверждено реальной вёрсткой композера — Quill,
-  // contenteditable-редактор с классом .ql-editor.
-  const COMPOSE_EDITOR_SELECTOR = '.ql-editor[contenteditable="true"]';
+  // Изначально (TZ п.6.2) композер был на Quill (.ql-editor). Chatterfy
+  // обновили интерфейс и перевели поле ввода на Tiptap/ProseMirror —
+  // новая вёрстка: <div contenteditable="true" class="tiptap ProseMirror
+  // composer-editor ...">. Селектор матчит оба варианта, чтобы не
+  // сломаться снова при похожем обновлении (и чтобы расширение работало
+  // и на ещё не обновившихся инстансах Chatterfy, если они есть).
+  const COMPOSE_EDITOR_SELECTOR = [
+    '.ql-editor[contenteditable="true"]',
+    '.composer-editor[contenteditable="true"]',
+    '.ProseMirror[contenteditable="true"]',
+  ].join(', ');
 
   // Подтверждено docs/chatterfy-api-reference.md §1: заголовок
   // `authorization: <JWT>` без префикса "Bearer", токен — в localStorage/

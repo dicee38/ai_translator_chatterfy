@@ -1,0 +1,113 @@
+/* Кнопка "Предложить ответ" — стоит слева от кнопки перевода
+   (extension/compose-button.css, right: 6px, width: 26px), чтобы не
+   перекрывались: 6 + 26 + 6 = 38px отступ. */
+.cft-reply-trigger {
+  position: absolute;
+  right: 38px;
+  bottom: 6px;
+  z-index: 100;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: #3b82f6;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.cft-reply-trigger:hover {
+  opacity: 1;
+  background: #2563eb;
+}
+
+.cft-reply-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 101;
+  background: #1f2430;
+  color: #f0f2f6;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+}
+
+.cft-reply-panel--error .cft-reply-text {
+  color: #fca5a5;
+}
+
+.cft-reply-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cft-reply-row:first-child {
+  margin-top: 0;
+}
+
+.cft-reply-block {
+  margin-bottom: 8px;
+}
+
+.cft-reply-label {
+  font-size: 11px;
+  color: #9aa4b2;
+  margin-bottom: 2px;
+}
+
+.cft-reply-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.cft-reply-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #3b82f6;
+  color: white;
+}
+
+.cft-reply-btn:hover {
+  background: #2563eb;
+}
+
+.cft-reply-btn--ghost {
+  background: transparent;
+  color: #9aa4b2;
+}
+
+.cft-reply-btn--ghost:hover {
+  color: #f0f2f6;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cft-reply-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #f0f2f6;
+  animation: cft-reply-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes cft-reply-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
